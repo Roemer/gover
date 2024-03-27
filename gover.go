@@ -103,6 +103,14 @@ func (a *Version) CompareTo(b *Version) int {
 	return compareInt(len(a.Segments), len(b.Segments))
 }
 
+func (a *Version) GreaterThan(b *Version) bool {
+	return a.CompareTo(b) == 1
+}
+
+func (a *Version) LessThan(b *Version) bool {
+	return a.CompareTo(b) == -1
+}
+
 func Sort(versions []*Version) {
 	slices.SortStableFunc(versions, Compare)
 }
@@ -130,7 +138,9 @@ func FindMax(versions []*Version, reqVersion *Version, onlyWithoutStringValues b
 			}
 		}
 		if isValid {
-			max = v
+			if max == nil || v.GreaterThan(max) {
+				max = v
+			}
 		}
 	}
 	return max

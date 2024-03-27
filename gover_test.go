@@ -69,23 +69,25 @@ func TestJavaVersioning(t *testing.T) {
 	})
 
 	// Build the list with parsed versions
-	versions := []*Version{}
+	versionsSorted := []*Version{}
+	versionsRandomized := []*Version{}
 	for _, versionString := range versionListRandomized {
-		versions = append(versions, MustParseVersionFromRegex(versionString, reg))
+		versionsSorted = append(versionsSorted, MustParseVersionFromRegex(versionString, reg))
+		versionsRandomized = append(versionsRandomized, MustParseVersionFromRegex(versionString, reg))
 	}
-	Sort(versions)
+	Sort(versionsSorted)
 
 	// Test the sorting
-	for i, version := range versions {
+	for i, version := range versionsSorted {
 		assert.Equal(versionListSorted[i], version.Original)
 	}
 
 	// Test FindMax
-	assert.Equal(FindMax(versions, EmptyVersion, true).Original, "21.0.2-50")
-	assert.Equal(FindMax(versions, ParseSimple(21), true).Original, "21.0.2-50")
-	assert.Equal(FindMax(versions, ParseSimple(21, 0, 1), true).Original, "21.0.1-4")
-	assert.Equal(FindMax(versions, ParseSimple(11, 0, 19), true).Original, "11.0.19-2")
-	assert.Equal(FindMax(versions, ParseSimple(17, 0, 8), true).Original, "17.0.8-5")
+	assert.Equal(FindMax(versionsRandomized, EmptyVersion, true).Original, "21.0.2-50")
+	assert.Equal(FindMax(versionsRandomized, ParseSimple(21), true).Original, "21.0.2-50")
+	assert.Equal(FindMax(versionsRandomized, ParseSimple(21, 0, 1), true).Original, "21.0.1-4")
+	assert.Equal(FindMax(versionsRandomized, ParseSimple(11, 0, 19), true).Original, "11.0.19-2")
+	assert.Equal(FindMax(versionsRandomized, ParseSimple(17, 0, 8), true).Original, "17.0.8-5")
 }
 
 func TestError(t *testing.T) {
