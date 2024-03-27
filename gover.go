@@ -1,6 +1,7 @@
 package gover
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -18,6 +19,10 @@ var RegexpSemver *regexp.Regexp = regexp.MustCompile(`^(?P<d1>\d+)\.(?P<d2>\d+)\
 
 // An empty version, can be used to find the max version of a list.
 var EmptyVersion *Version = &Version{}
+
+var (
+	ErrNoMatch = errors.New("failed matching")
+)
 
 // Type that represents a version object.
 type Version struct {
@@ -160,7 +165,7 @@ func MustParseVersionFromRegex(versionString string, versionRegexp *regexp.Regex
 func ParseVersionFromRegex(versionString string, versionRegexp *regexp.Regexp) (*Version, error) {
 	matchMap := findNamedMatches(versionRegexp, versionString, true)
 	if matchMap == nil {
-		return nil, fmt.Errorf("failed parsing the version: %s", versionString)
+		return nil, fmt.Errorf("failed parsing the version %s: %w", versionString, ErrNoMatch)
 	}
 
 	// Build a map with index and the segments

@@ -87,3 +87,18 @@ func TestJavaVersioning(t *testing.T) {
 	assert.Equal(FindMax(versions, ParseSimple(11, 0, 19), true).Original, "11.0.19-2")
 	assert.Equal(FindMax(versions, ParseSimple(17, 0, 8), true).Original, "17.0.8-5")
 }
+
+func TestError(t *testing.T) {
+	assert := assert.New(t)
+
+	reg := regexp.MustCompile(`^a(?P<d1>\d+)$`)
+
+	vNoError, err := ParseVersionFromRegex("a1", reg)
+	assert.NotNil(vNoError)
+	assert.Nil(err)
+
+	vError, err := ParseVersionFromRegex("b1", reg)
+	assert.Nil(vError)
+	assert.NotNil(err)
+	assert.ErrorIs(err, ErrNoMatch)
+}
