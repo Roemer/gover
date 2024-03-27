@@ -1,4 +1,4 @@
-module gover
+module github.com/roemer/gover
 
 go 1.21
 
