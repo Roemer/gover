@@ -16,6 +16,9 @@ var RegexpSimple *regexp.Regexp = regexp.MustCompile(`^(?P<d1>\d+)(?:\.(?P<d2>\d
 // d.d.d(-s)(+s)
 var RegexpSemver *regexp.Regexp = regexp.MustCompile(`^(?P<d1>\d+)\.(?P<d2>\d+)\.(?P<d3>\d+)(?:-(?P<s4>[^+]+))?(?:\+(?P<s5>.*))?$`)
 
+// An empty version, can be used to find the max version of a list.
+var EmptyVersion *Version = &Version{}
+
 // Type that represents a version object.
 type Version struct {
 	Original string

@@ -81,6 +81,7 @@ func TestJavaVersioning(t *testing.T) {
 	}
 
 	// Test FindMax
+	assert.Equal(FindMax(versions, EmptyVersion, true).Original, "21.0.2-50")
 	assert.Equal(FindMax(versions, ParseSimple(21), true).Original, "21.0.2-50")
 	assert.Equal(FindMax(versions, ParseSimple(21, 0, 1), true).Original, "21.0.1-4")
 	assert.Equal(FindMax(versions, ParseSimple(11, 0, 19), true).Original, "11.0.19-2")
