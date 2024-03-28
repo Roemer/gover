@@ -120,21 +120,25 @@ func FindMax(versions []*Version, referenceVersion *Version, onlyWithoutStringVa
 	var max *Version = nil
 	for _, v := range versions {
 		isValid := true
-		for i, s := range referenceVersion.Segments {
-			versionSegment := v.Segments[i]
+		// Loop thru the segments of a possible candidate
+		for i, versionSegment := range v.Segments {
 			// Invalidate if no text is allowed
 			if onlyWithoutStringValues && versionSegment.IsText {
 				isValid = false
 				break
 			}
-			// No requirement from the required version, so it is valid
-			if s.IsNotDefined {
-				continue
-			}
-			// Iinvalidate if the number does not match
-			if s.Number != versionSegment.Number {
-				isValid = false
-				break
+			// Check if the segment of the reference version matches
+			if len(referenceVersion.Segments) > i {
+				referenceSegment := referenceVersion.Segments[i]
+				// No requirement from the reference version, so it is valid
+				if referenceSegment.IsNotDefined {
+					continue
+				}
+				// Invalidate if the number does not match
+				if referenceSegment.Number != versionSegment.Number {
+					isValid = false
+					break
+				}
 			}
 		}
 		if isValid {

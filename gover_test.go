@@ -99,6 +99,56 @@ func TestJavaVersioning(t *testing.T) {
 	assert.Equal(FindMax(versionsRandomized, ParseSimple(17, 0, 8), true).Original, "17.0.8-5")
 }
 
+func TestMax(t *testing.T) {
+	assert := assert.New(t)
+
+	versionList := []string{
+		"2.0-alpha-1",
+		"2.0-alpha-2",
+		"2.0-alpha-3",
+		"2.0-beta-1",
+		"2.0-beta-2",
+		"2.0-beta-3",
+		"2.0",
+		"2.0.1",
+		"2.0.2",
+		"2.0.3",
+		"2.0.4",
+		"2.1.0-M1",
+		"3.0-alpha-1",
+		"3.0-alpha-2",
+		"3.0-alpha-3",
+		"3.0-alpha-4",
+		"3.0-alpha-5",
+		"3.0-alpha-6",
+		"3.0-alpha-7",
+		"3.0-beta-1",
+		"3.0-beta-2",
+		"3.0-beta-3",
+		"3.0",
+		"3.5.0-alpha-1",
+		"3.5.0-beta-1",
+		"3.5.0",
+		"3.5.2",
+		"3.5.3",
+		"3.5.4",
+		"3.6.0",
+		"4.0.0-alpha-2",
+		"4.0.0-alpha-3",
+	}
+
+	reg := regexp.MustCompile(`^(?P<d1>\d+)\.(?P<d2>\d+)(?:\.(?P<d3>\d+))?(?:-(?P<s4>[^-]+))?(?:-(?P<d5>\d+))?$`)
+
+	allVersions := []*Version{}
+	for _, v := range versionList {
+		parsedVersion := MustParseVersionFromRegex(v, reg)
+		allVersions = append(allVersions, parsedVersion)
+	}
+
+	assert.Equal(FindMax(allVersions, EmptyVersion, false).Original, "4.0.0-alpha-3")
+	assert.Equal(FindMax(allVersions, EmptyVersion, true).Original, "3.6.0")
+}
+
 func TestError(t *testing.T) {
 	assert := assert.New(t)
 
