@@ -116,11 +116,11 @@ func Sort(versions []*Version) {
 }
 
 // Gets the maximum version which complies to a given version of a list of versions.
-func FindMax(versions []*Version, reqVersion *Version, onlyWithoutStringValues bool) *Version {
+func FindMax(versions []*Version, referenceVersion *Version, onlyWithoutStringValues bool) *Version {
 	var max *Version = nil
 	for _, v := range versions {
 		isValid := true
-		for i, s := range reqVersion.Segments {
+		for i, s := range referenceVersion.Segments {
 			versionSegment := v.Segments[i]
 			// Invalidate if no text is allowed
 			if onlyWithoutStringValues && versionSegment.IsText {
