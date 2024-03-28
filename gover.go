@@ -154,15 +154,31 @@ func FindMax(versions []*Version, reqVersion *Version, onlyWithoutStringValues b
 func ParseSimple(parts ...interface{}) *Version {
 	version := &Version{}
 	for _, part := range parts {
-		newSegment := VersionSegment{}
+		segmentsToAdd := []VersionSegment{}
 		switch v := part.(type) {
 		case int:
-			newSegment.Number = v
+			segmentsToAdd = append(segmentsToAdd, VersionSegment{
+				Number: v,
+			})
+		case string:
+			segmentsToAdd = append(segmentsToAdd, buildSegmentFromString(v))
+		case []int:
+			for _, x := range v {
+				segmentsToAdd = append(segmentsToAdd, VersionSegment{
+					Number: x,
+				})
+			}
+		case []string:
+			for _, x := range v {
+				segmentsToAdd = append(segmentsToAdd, buildSegmentFromString(x))
+			}
 		default:
-			newSegment.Text = fmt.Sprintf("%v", v)
-			newSegment.IsText = true
+			// Conver the value to string
+			str := fmt.Sprintf("%v", v)
+			segmentsToAdd = append(segmentsToAdd, buildSegmentFromString(str))
 		}
-		version.Segments = append(version.Segments, newSegment)
+		// Add all the new segments
+		version.Segments = append(version.Segments, segmentsToAdd...)
 	}
 	return version
 }
@@ -274,6 +290,21 @@ func findNamedMatches(regex *regexp.Regexp, str string, includeNotMatchedOptiona
 		results[name] = str[startIndex:endIndex]
 	}
 	return results
+}
+
+// Converts a string to a segment
+func buildSegmentFromString(value string) VersionSegment {
+	// First try to convert to integer
+	if n, err := strconv.Atoi(value); err == nil {
+		return VersionSegment{
+			Number: n,
+		}
+	}
+	// Failed, so just create a text segment
+	return VersionSegment{
+		Text:   value,
+		IsText: true,
+	}
 }
 
 func must[T any](obj T, err error) T {

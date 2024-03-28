@@ -3,6 +3,7 @@ package gover
 import (
 	"math/rand"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,6 +26,14 @@ func TestParseSimple(t *testing.T) {
 		assert.Equal(1, v2.Segments[0].Number)
 		assert.Equal("hello", v2.Segments[1].Text)
 		assert.Equal(3, v2.Segments[2].Number)
+	}
+
+	{
+		v3 := ParseSimple(strings.Split("1.2.3", "."))
+		assert.Len(v3.Segments, 3)
+		assert.Equal(1, v3.Segments[0].Number)
+		assert.Equal(2, v3.Segments[1].Number)
+		assert.Equal(3, v3.Segments[2].Number)
 	}
 }
 
