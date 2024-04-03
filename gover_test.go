@@ -149,6 +149,69 @@ func TestMax(t *testing.T) {
 	assert.Equal(FindMax(allVersions, EmptyVersion, true).Original, "3.6.0")
 }
 
+func TestAutoNumbering(t *testing.T) {
+	assert := assert.New(t)
+	reg := regexp.MustCompile(`^(\d+)(?:\.(\d+))?(?:-(.+))?$`)
+	versionList := []string{
+		"1",
+		"2.0-a",
+		"2.0-b",
+		"2.0",
+		"2.5-rc",
+		"2.5",
+	}
+
+	allVersions := []*Version{}
+	for _, v := range versionList {
+		parsedVersion := MustParseVersionFromRegex(v, reg)
+		allVersions = append(allVersions, parsedVersion)
+	}
+
+	assert.Len(allVersions, 6)
+	{
+		checkVersion := allVersions[0]
+		assert.Len(checkVersion.Segments, 3)
+		assert.Equal(1, checkVersion.Segments[0].Number)
+		assert.True(checkVersion.Segments[1].IsNotDefined)
+		assert.True(checkVersion.Segments[2].IsNotDefined)
+	}
+	{
+		checkVersion := allVersions[1]
+		assert.Len(checkVersion.Segments, 3)
+		assert.Equal(2, checkVersion.Segments[0].Number)
+		assert.Equal(0, checkVersion.Segments[1].Number)
+		assert.Equal("a", checkVersion.Segments[2].Text)
+	}
+	{
+		checkVersion := allVersions[2]
+		assert.Len(checkVersion.Segments, 3)
+		assert.Equal(2, checkVersion.Segments[0].Number)
+		assert.Equal(0, checkVersion.Segments[1].Number)
+		assert.Equal("b", checkVersion.Segments[2].Text)
+	}
+	{
+		checkVersion := allVersions[3]
+		assert.Len(checkVersion.Segments, 3)
+		assert.Equal(2, checkVersion.Segments[0].Number)
+		assert.Equal(0, checkVersion.Segments[1].Number)
+		assert.True(checkVersion.Segments[2].IsNotDefined)
+	}
+	{
+		checkVersion := allVersions[4]
+		assert.Len(checkVersion.Segments, 3)
+		assert.Equal(2, checkVersion.Segments[0].Number)
+		assert.Equal(5, checkVersion.Segments[1].Number)
+		assert.Equal("rc", checkVersion.Segments[2].Text)
+	}
+	{
+		checkVersion := allVersions[5]
+		assert.Len(checkVersion.Segments, 3)
+		assert.Equal(2, checkVersion.Segments[0].Number)
+		assert.Equal(5, checkVersion.Segments[1].Number)
+		assert.True(checkVersion.Segments[2].IsNotDefined)
+	}
+}
+
 func TestError(t *testing.T) {
 	assert := assert.New(t)
 

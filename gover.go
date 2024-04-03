@@ -215,13 +215,16 @@ func ParseVersionFromRegex(versionString string, versionRegexp *regexp.Regexp) (
 			// String
 			newSegment.Text = v
 			newSegment.IsText = true
-		} else {
+		} else if k[0] == 'd' {
 			// Number
 			num, err := strconv.Atoi(v)
 			if err != nil {
 				return nil, fmt.Errorf("invalid value for number group %s: %s", k, v)
 			}
 			newSegment.Number = num
+		} else {
+			// Anything else, dynamically create text or number segment
+			newSegment = buildSegmentFromString(v)
 		}
 		// Insert the new segment to the map
 		insertMap[index] = newSegment
@@ -280,6 +283,10 @@ func findNamedMatches(regex *regexp.Regexp, str string, includeNotMatchedOptiona
 	results := map[string]string{}
 	// Loop thru the subexp names (skipping the first empty one)
 	for i, name := range (subexpNames)[1:] {
+		if name == "" {
+			// No name, so automatically give it a name
+			name = fmt.Sprintf("p%d", (i + 1))
+		}
 		startIndex := match[i*2+2]
 		endIndex := match[i*2+3]
 		if startIndex == -1 || endIndex == -1 {
