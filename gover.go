@@ -111,6 +111,10 @@ func (a *Version) LessThan(b *Version) bool {
 	return a.CompareTo(b) == -1
 }
 
+func (a *Version) Equals(b *Version) bool {
+	return a.CompareTo(b) == 0
+}
+
 func Sort(versions []*Version) {
 	slices.SortStableFunc(versions, Compare)
 }
