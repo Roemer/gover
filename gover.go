@@ -119,13 +119,13 @@ func Sort(versions []*Version) {
 	slices.SortStableFunc(versions, Compare)
 }
 
-// Gets the maximum version which complies to a given version of a list of versions.
-func FindMax(versions []*Version, referenceVersion *Version, onlyWithoutStringValues bool) *Version {
+func FindMaxGeneric[T any](versions []T, getFunc func(x T) *Version, referenceVersion *Version, onlyWithoutStringValues bool) *Version {
 	var max *Version = nil
 	for _, v := range versions {
+		version := getFunc(v)
 		isValid := true
 		// Loop thru the segments of a possible candidate
-		for i, versionSegment := range v.Segments {
+		for i, versionSegment := range version.Segments {
 			// Invalidate if no text is allowed
 			if onlyWithoutStringValues && versionSegment.IsText {
 				isValid = false
@@ -146,12 +146,17 @@ func FindMax(versions []*Version, referenceVersion *Version, onlyWithoutStringVa
 			}
 		}
 		if isValid {
-			if max == nil || v.GreaterThan(max) {
-				max = v
+			if max == nil || version.GreaterThan(max) {
+				max = version
 			}
 		}
 	}
 	return max
+}
+
+// Gets the maximum version which complies to a given version of a list of versions.
+func FindMax(versions []*Version, referenceVersion *Version, onlyWithoutStringValues bool) *Version {
+	return FindMaxGeneric(versions, func(x *Version) *Version { return x }, referenceVersion, onlyWithoutStringValues)
 }
 
 //////////
