@@ -88,15 +88,15 @@ func TestJavaVersioning(t *testing.T) {
 
 	// Test the sorting
 	for i, version := range versionsSorted {
-		assert.Equal(versionListSorted[i], version.Original)
+		assert.Equal(versionListSorted[i], version.Raw)
 	}
 
 	// Test FindMax
-	assert.Equal(FindMax(versionsRandomized, EmptyVersion, true).Original, "21.0.2-50")
-	assert.Equal(FindMax(versionsRandomized, ParseSimple(21), true).Original, "21.0.2-50")
-	assert.Equal(FindMax(versionsRandomized, ParseSimple(21, 0, 1), true).Original, "21.0.1-4")
-	assert.Equal(FindMax(versionsRandomized, ParseSimple(11, 0, 19), true).Original, "11.0.19-2")
-	assert.Equal(FindMax(versionsRandomized, ParseSimple(17, 0, 8), true).Original, "17.0.8-5")
+	assert.Equal(FindMax(versionsRandomized, EmptyVersion, true).Raw, "21.0.2-50")
+	assert.Equal(FindMax(versionsRandomized, ParseSimple(21), true).Raw, "21.0.2-50")
+	assert.Equal(FindMax(versionsRandomized, ParseSimple(21, 0, 1), true).Raw, "21.0.1-4")
+	assert.Equal(FindMax(versionsRandomized, ParseSimple(11, 0, 19), true).Raw, "11.0.19-2")
+	assert.Equal(FindMax(versionsRandomized, ParseSimple(17, 0, 8), true).Raw, "17.0.8-5")
 }
 
 func TestMax(t *testing.T) {
@@ -145,8 +145,8 @@ func TestMax(t *testing.T) {
 		allVersions = append(allVersions, parsedVersion)
 	}
 
-	assert.Equal(FindMax(allVersions, EmptyVersion, false).Original, "4.0.0-alpha-3")
-	assert.Equal(FindMax(allVersions, EmptyVersion, true).Original, "3.6.0")
+	assert.Equal(FindMax(allVersions, EmptyVersion, false).Raw, "4.0.0-alpha-3")
+	assert.Equal(FindMax(allVersions, EmptyVersion, true).Raw, "3.6.0")
 }
 
 func TestAutoNumbering(t *testing.T) {

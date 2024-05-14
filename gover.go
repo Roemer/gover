@@ -1,6 +1,7 @@
 package gover
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"regexp"
@@ -26,7 +27,7 @@ var (
 
 // Type that represents a version object.
 type Version struct {
-	Original string
+	Raw      string
 	Segments []VersionSegment
 }
 
@@ -94,13 +95,13 @@ func (a *Version) CompareTo(b *Version) int {
 				return c
 			}
 		} else {
-			if c := compareInt(segmentA.Number, segmentB.Number); c != 0 {
+			if c := cmp.Compare(segmentA.Number, segmentB.Number); c != 0 {
 				return c
 			}
 		}
 	}
 	// Favor the one with more segments
-	return compareInt(len(a.Segments), len(b.Segments))
+	return cmp.Compare(len(a.Segments), len(b.Segments))
 }
 
 func (a *Version) GreaterThan(b *Version) bool {
@@ -119,8 +120,9 @@ func Sort(versions []*Version) {
 	slices.SortStableFunc(versions, Compare)
 }
 
-func FindMaxGeneric[T any](versions []T, getFunc func(x T) *Version, referenceVersion *Version, onlyWithoutStringValues bool) *Version {
+func FindMaxGeneric[T any](versions []T, getFunc func(x T) *Version, referenceVersion *Version, onlyWithoutStringValues bool) T {
 	var max *Version = nil
+	var maxObject T
 	for _, v := range versions {
 		version := getFunc(v)
 		isValid := true
@@ -148,10 +150,11 @@ func FindMaxGeneric[T any](versions []T, getFunc func(x T) *Version, referenceVe
 		if isValid {
 			if max == nil || version.GreaterThan(max) {
 				max = version
+				maxObject = v
 			}
 		}
 	}
-	return max
+	return maxObject
 }
 
 // Gets the maximum version which complies to a given version of a list of versions.
@@ -240,7 +243,7 @@ func ParseVersionFromRegex(versionString string, versionRegexp *regexp.Regexp) (
 	}
 
 	// Add the segments in the correct order
-	parsedVersion := &Version{Original: versionString}
+	parsedVersion := &Version{Raw: versionString}
 	index := 1
 	for {
 		if value, ok := insertMap[index]; !ok {
@@ -257,16 +260,6 @@ func ParseVersionFromRegex(versionString string, versionRegexp *regexp.Regexp) (
 //////////
 // Internal methods
 //////////
-
-func compareInt(a int, b int) int {
-	if a > b {
-		return 1
-	}
-	if b > a {
-		return -1
-	}
-	return 0
-}
 
 // Compares two strings ignoring case. An empty string is peferred to a defined string.
 func compareString(a string, b string) int {
