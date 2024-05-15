@@ -48,6 +48,15 @@ func (v *Version) String() string {
 	return strings.Join(strs, "|")
 }
 
+// StringPart Converts the version to a string with n segments, separated with a dot
+func (v *Version) StringPart(numParts int) string {
+	strs := make([]string, numParts)
+	for i := 0; i < numParts; i++ {
+		strs[i] = v.Segments[i].String()
+	}
+	return strings.Join(strs, ".")
+}
+
 // Converts the version segment to a readable string.
 func (v *VersionSegment) String() string {
 	if v.IsNotDefined {

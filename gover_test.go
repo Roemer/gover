@@ -226,3 +226,14 @@ func TestError(t *testing.T) {
 	assert.NotNil(err)
 	assert.ErrorIs(err, ErrNoMatch)
 }
+
+func TestStringPart(t *testing.T) {
+	assert := assert.New(t)
+
+	version := ParseSimple(1, 2, 3, 4)
+
+	assert.Equal("1", version.StringPart(1))
+	assert.Equal("1.2", version.StringPart(2))
+	assert.Equal("1.2.3", version.StringPart(3))
+	assert.Equal("1.2.3.4", version.StringPart(4))
+}
