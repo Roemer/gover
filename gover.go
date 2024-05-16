@@ -48,11 +48,15 @@ func (v *Version) String() string {
 	return strings.Join(strs, "|")
 }
 
-// StringPart Converts the version to a string with n segments, separated with a dot
-func (v *Version) StringPart(numParts int) string {
-	strs := make([]string, numParts)
-	for i := 0; i < numParts; i++ {
-		strs[i] = v.Segments[i].String()
+// CoreVersion Converts the version to a core SemVer string in the form major.minor.path
+func (v *Version) CoreVersion() string {
+	strs := make([]string, 3)
+	for i := 0; i < 3; i++ {
+		if len(v.Segments) > i {
+			strs[i] = v.Segments[i].String()
+		} else {
+			strs[i] = "0"
+		}
 	}
 	return strings.Join(strs, ".")
 }

@@ -227,13 +227,18 @@ func TestError(t *testing.T) {
 	assert.ErrorIs(err, ErrNoMatch)
 }
 
-func TestStringPart(t *testing.T) {
+func TestCoreVersion(t *testing.T) {
 	assert := assert.New(t)
 
-	version := ParseSimple(1, 2, 3, 4)
+	version := ParseSimple(1)
+	assert.Equal("1.0.0", version.CoreVersion())
 
-	assert.Equal("1", version.StringPart(1))
-	assert.Equal("1.2", version.StringPart(2))
-	assert.Equal("1.2.3", version.StringPart(3))
-	assert.Equal("1.2.3.4", version.StringPart(4))
+	version = ParseSimple(1, 2)
+	assert.Equal("1.2.0", version.CoreVersion())
+
+	version = ParseSimple(1, 2, 3)
+	assert.Equal("1.2.3", version.CoreVersion())
+
+	version = ParseSimple(1, 2, 3, 4)
+	assert.Equal("1.2.3", version.CoreVersion())
 }
