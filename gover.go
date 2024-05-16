@@ -50,14 +50,19 @@ func (v *Version) String() string {
 
 // CoreVersion Converts the version to a core SemVer string in the form major.minor.path
 func (v *Version) CoreVersion() string {
-	strs := make([]string, 3)
+	strs := []string{}
 	for i := 0; i < 3; i++ {
-		if len(v.Segments) > i {
-			strs[i] = v.Segments[i].String()
+		if len(v.Segments) > i && !v.Segments[i].IsText && !v.Segments[i].IsNotDefined {
+			strs = append(strs, v.Segments[i].String())
 		} else {
-			strs[i] = "0"
+			break
 		}
 	}
+
+	for i := len(strs); i < 3; i++ {
+		strs = append(strs, "0")
+	}
+
 	return strings.Join(strs, ".")
 }
 
@@ -134,7 +139,7 @@ func Sort(versions []*Version) {
 }
 
 func FindMaxGeneric[T any](versions []T, getFunc func(x T) *Version, referenceVersion *Version, onlyWithoutStringValues bool) T {
-	var max *Version = nil
+	var maxVersion *Version = nil
 	var maxObject T
 	for _, v := range versions {
 		version := getFunc(v)
@@ -161,8 +166,8 @@ func FindMaxGeneric[T any](versions []T, getFunc func(x T) *Version, referenceVe
 			}
 		}
 		if isValid {
-			if max == nil || version.GreaterThan(max) {
-				max = version
+			if maxVersion == nil || version.GreaterThan(maxVersion) {
+				maxVersion = version
 				maxObject = v
 			}
 		}

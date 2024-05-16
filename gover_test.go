@@ -241,4 +241,18 @@ func TestCoreVersion(t *testing.T) {
 
 	version = ParseSimple(1, 2, 3, 4)
 	assert.Equal("1.2.3", version.CoreVersion())
+
+	version = ParseSimple("a", 2, 3)
+	assert.Equal("0.0.0", version.CoreVersion())
+
+	version = ParseSimple(1, "a", 3)
+	assert.Equal("1.0.0", version.CoreVersion())
+
+	version = ParseSimple(1, 2, "b")
+	assert.Equal("1.2.0", version.CoreVersion())
+
+	regex := regexp.MustCompile(`^(?P<d1>\d+)(?:\.(?P<d2>\d+))?(?:\+(?P<d3>\d+))?$`)
+	version = MustParseVersionFromRegex("1+3", regex)
+	assert.Equal(version.Segments[1].IsNotDefined, true)
+	assert.Equal("1.0.0", version.CoreVersion())
 }
