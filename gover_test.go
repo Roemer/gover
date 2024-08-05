@@ -149,6 +149,49 @@ func TestMax(t *testing.T) {
 	assert.Equal(FindMax(allVersions, EmptyVersion, true).Raw, "3.6.0")
 }
 
+func TestMaxMostSpecific(t *testing.T) {
+	assert := assert.New(t)
+
+	versionList := []string{
+		"1.0.0",
+		"2",
+		"2.0",
+		"2.0.0",
+		"2.1.0",
+		"2.1",
+	}
+
+	allVersions := []*Version{}
+	for _, v := range versionList {
+		parsedVersion := MustParseVersionFromRegex(v, RegexpSimple)
+		allVersions = append(allVersions, parsedVersion)
+	}
+
+	assert.Equal("2.0.0", FindMax(allVersions, ParseSimple(2, 0), false).Raw)
+	assert.Equal("2.1.0", FindMax(allVersions, ParseSimple(2), false).Raw)
+	assert.Equal("2.1.0", FindMax(allVersions, EmptyVersion, false).Raw)
+}
+
+func TestSegmentCount(t *testing.T) {
+	assert := assert.New(t)
+
+	versionList := []string{
+		"2",
+		"2.0.0",
+	}
+
+	allVersions := []*Version{}
+	for _, v := range versionList {
+		parsedVersion := MustParseVersionFromRegex(v, RegexpSimple)
+		allVersions = append(allVersions, parsedVersion)
+	}
+
+	assert.Equal(1, allVersions[0].SegmentCount(true))
+	assert.Equal(3, allVersions[0].SegmentCount(false))
+	assert.Equal(3, allVersions[1].SegmentCount(true))
+	assert.Equal(3, allVersions[1].SegmentCount(false))
+}
+
 func TestAutoNumbering(t *testing.T) {
 	assert := assert.New(t)
 	reg := regexp.MustCompile(`^(\d+)(?:\.(\d+))?(?:-(.+))?$`)

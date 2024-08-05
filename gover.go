@@ -48,6 +48,17 @@ func (v *Version) String() string {
 	return strings.Join(strs, "|")
 }
 
+func (v *Version) SegmentCount(onlyDefined bool) int {
+	count := 0
+	for _, segment := range v.Segments {
+		if onlyDefined && segment.IsNotDefined {
+			continue
+		}
+		count++
+	}
+	return count
+}
+
 // CoreVersion Converts the version to a core SemVer string in the form major.minor.path
 func (v *Version) CoreVersion() string {
 	strs := []string{}
@@ -166,7 +177,9 @@ func FindMaxGeneric[T any](versions []T, getFunc func(x T) *Version, referenceVe
 			}
 		}
 		if isValid {
-			if maxVersion == nil || version.GreaterThan(maxVersion) {
+			if maxVersion == nil ||
+				version.GreaterThan(maxVersion) ||
+				(version.Equals(maxVersion) && version.SegmentCount(true) > maxVersion.SegmentCount(true)) {
 				maxVersion = version
 				maxObject = v
 			}
