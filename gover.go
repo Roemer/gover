@@ -27,8 +27,12 @@ var (
 
 // Type that represents a version object.
 type Version struct {
-	Raw      string
+	// The raw string of the version.
+	Raw string
+	// The different segements of the version.
 	Segments []VersionSegment
+	// A field for custom data for the version object.
+	CustomData interface{}
 }
 
 // A segment of the version, can either be a number or a text.
