@@ -153,6 +153,7 @@ func Sort(versions []*Version) {
 	slices.SortStableFunc(versions, Compare)
 }
 
+// Gets the maximum version which complies to a given version of a list of objects that contain a version.
 func FindMaxGeneric[T any](versions []T, getFunc func(x T) *Version, referenceVersion *Version, onlyWithoutStringValues bool) T {
 	var maxVersion *Version = nil
 	var maxObject T
@@ -234,12 +235,17 @@ func ParseSimple(parts ...interface{}) *Version {
 	return version
 }
 
+// Parses the given version string with the regexp into the version object. Throws a panic on error.
 func MustParseVersionFromRegex(versionString string, versionRegexp *regexp.Regexp) *Version {
 	return must(ParseVersionFromRegex(versionString, versionRegexp))
 }
 
 // Parses the given version string with the regexp into the version object.
 func ParseVersionFromRegex(versionString string, versionRegexp *regexp.Regexp) (*Version, error) {
+	// Initially set the raw value to the full version string
+	rawValue := versionString
+
+	// Find the named matches of the parts
 	matchMap := findNamedMatches(versionRegexp, versionString, true)
 	if matchMap == nil {
 		return nil, fmt.Errorf("failed parsing the version %s: %w", versionString, ErrNoMatch)
@@ -248,6 +254,12 @@ func ParseVersionFromRegex(versionString string, versionRegexp *regexp.Regexp) (
 	// Build a map with index and the segments
 	insertMap := map[int]VersionSegment{}
 	for k, v := range matchMap {
+		// Special handling for the raw group
+		if k == "raw" {
+			// Set the raw value to the value of the group
+			rawValue = v
+			continue
+		}
 		// Get the index of the current segment being processed
 		index, err := strconv.Atoi(k[1:])
 		if err != nil {
@@ -278,7 +290,7 @@ func ParseVersionFromRegex(versionString string, versionRegexp *regexp.Regexp) (
 	}
 
 	// Add the segments in the correct order
-	parsedVersion := &Version{Raw: versionString}
+	parsedVersion := &Version{Raw: rawValue}
 	index := 1
 	for {
 		if value, ok := insertMap[index]; !ok {
@@ -310,6 +322,7 @@ func compareString(a string, b string) int {
 	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
 }
 
+// Find all parts represented by capturing groups. Either with their name or otherwise names them with <p<index>>.
 func findNamedMatches(regex *regexp.Regexp, str string, includeNotMatchedOptional bool) map[string]string {
 	match := regex.FindStringSubmatchIndex(str)
 	if match == nil {
@@ -318,11 +331,15 @@ func findNamedMatches(regex *regexp.Regexp, str string, includeNotMatchedOptiona
 	}
 	subexpNames := regex.SubexpNames()
 	results := map[string]string{}
+	indexAdjustment := 0 // Holds an index adjustment in case a raw value was found (and should not be counted)
 	// Loop thru the subexp names (skipping the first empty one)
 	for i, name := range (subexpNames)[1:] {
+		if name == "raw" {
+			indexAdjustment = -1
+		}
 		if name == "" {
 			// No name, so automatically give it a name
-			name = fmt.Sprintf("p%d", (i + 1))
+			name = fmt.Sprintf("p%d", (i + 1 + indexAdjustment))
 		}
 		startIndex := match[i*2+2]
 		endIndex := match[i*2+3]

@@ -299,3 +299,26 @@ func TestCoreVersion(t *testing.T) {
 	assert.Equal(version.Segments[1].IsNotDefined, true)
 	assert.Equal("1.0.0", version.CoreVersion())
 }
+
+func TestRaw(t *testing.T) {
+	assert := assert.New(t)
+
+	// Simple
+	{
+		version, err := ParseVersionFromRegex("go4.5.6", regexp.MustCompile(`go(?P<raw>(\d+).(\d+).(\d+))`))
+		if err != nil {
+			panic(err)
+		}
+		assert.Equal(version.Raw, "4.5.6")
+		assert.True(version.Equals(ParseSimple(4, 5, 6)))
+	}
+	// Partially numbered parts
+	{
+		version, err := ParseVersionFromRegex("go4.5.6", regexp.MustCompile(`go(?P<raw>(?P<d1>\d+).(?P<d2>\d+).(\d+))`))
+		if err != nil {
+			panic(err)
+		}
+		assert.Equal(version.Raw, "4.5.6")
+		assert.True(version.Equals(ParseSimple(4, 5, 6)))
+	}
+}
