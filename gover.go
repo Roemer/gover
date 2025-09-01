@@ -43,6 +43,11 @@ type VersionSegment struct {
 	IsNotDefined bool
 }
 
+// Returns a boolean if the segment has a defined value or not.
+func (v *VersionSegment) IsDefined() bool {
+	return !v.IsNotDefined
+}
+
 // Converts the version to a readable string.
 func (v *Version) String() string {
 	strs := make([]string, len(v.Segments))
@@ -52,11 +57,24 @@ func (v *Version) String() string {
 	return strings.Join(strs, "|")
 }
 
+// Returns the total count of the segments, either with undefined or without.
 func (v *Version) SegmentCount(onlyDefined bool) int {
 	count := 0
 	for _, segment := range v.Segments {
 		if onlyDefined && segment.IsNotDefined {
 			continue
+		}
+		count++
+	}
+	return count
+}
+
+// Returns the count of defined segments until an undefined one (or no more).
+func (v *Version) DefinedSegmentCount() int {
+	count := 0
+	for _, segment := range v.Segments {
+		if segment.IsNotDefined {
+			break
 		}
 		count++
 	}
