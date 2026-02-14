@@ -340,3 +340,72 @@ func TestRaw(t *testing.T) {
 		assert.True(version.Equals(ParseSimple(4, 5, 6)))
 	}
 }
+
+func TestGreaterOrLess(t *testing.T) {
+	assert := assert.New(t)
+
+	versionPairs := []struct {
+		v1 string
+		v2 string
+	}{
+		{"1.2.3", "1.2.4"},
+		{"1.2.3", "1.3.0"},
+		{"2.4.0", "3.1.2"},
+	}
+
+	for _, pair := range versionPairs {
+		v1 := ParseSimple(pair.v1)
+		v2 := ParseSimple(pair.v2)
+		assert.True(v1.LessThan(v2))
+		assert.False(v1.GreaterThan(v2))
+
+		assert.True(v1.GreaterThanOrEqual(v1))
+		assert.True(v1.LessThanOrEqual(v1))
+	}
+}
+
+func TestMatchConstraints(t *testing.T) {
+	assert := assert.New(t)
+
+	type testCase struct {
+		version     *Version
+		constraints string
+		shouldMatch bool
+	}
+	testCases := []testCase{
+		{ParseSimple(1, 2, 3), ">1.0.0", true},
+		{ParseSimple(1, 2, 3), "<1.0.0", false},
+		{ParseSimple(1, 2, 3), "<1.0.0 || >=1.2.3", true},
+		{ParseSimple(1, 2, 3), "<1.0.0 || >1.2.3", false},
+		{ParseSimple(1, 2, 3), "<1.0.0 || >=1.2.3 <2.0.0", true},
+		{ParseSimple(2, 2, 3), "<1.0.0 || >=1.2.3 <2.0.0", false},
+		{ParseSimple(1, 2, 3), "==1.2.3", true},
+		{ParseSimple(1, 2, 3), "!=1.2.3", false},
+		{ParseSimple(1, 2, 3), ">=1.2.3", true},
+		{ParseSimple(1, 2, 3), "<=1.2.3", true},
+		{ParseSimple(1, 2, 3), ">1.2.3", false},
+		{ParseSimple(1, 2, 3), "<1.2.3", false},
+		{ParseSimple(1, 2, 4), ">=1.2.3", true},
+		{ParseSimple(1, 2, 2), "<=1.2.3", true},
+		{ParseSimple(1, 2, 3), ">=1.0.0 <2.0.0", true},
+		{ParseSimple(2, 0, 0), ">=1.0.0 <2.0.0", false},
+		{ParseSimple(0, 5, 0), ">0.1.0", true},
+		{ParseSimple(0, 5, 0), "<=0.5.0", true},
+		{ParseSimple(1, 0, 0), "!=1.0.0", false},
+		{ParseSimple(1, 0, 1), "!=1.0.0", true},
+		{ParseSimple(1, 2, 3), "==1.2.3 || ==1.2.4", true},
+		{ParseSimple(1, 2, 3), "!=1.2.3 || ==1.2.3", true},
+		{ParseSimple(1, 2, 3), ">1.2.3 || <1.0.0", false},
+		{ParseSimple(1, 2, 3), ">=1.2.3 || <1.0.0", true},
+		{ParseSimple(1, 2, 3), "<=1.2.3 || >2.0.0", true},
+		{ParseSimple(2, 0, 0), ">=1.0.0 || <1.0.0", true},
+		{ParseSimple(0, 5, 0), ">0.1.0 || ==0.5.0", true},
+	}
+	for _, tc := range testCases {
+		version := tc.version
+		constraints := tc.constraints
+		match, err := version.MatchesConstraints(constraints)
+		assert.NoError(err)
+		assert.Equal(tc.shouldMatch, match, "Version %s should match constraint %s: expected %v", tc.version, tc.constraints, tc.shouldMatch)
+	}
+}

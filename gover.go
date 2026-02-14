@@ -32,7 +32,7 @@ type Version struct {
 	// The different segements of the version.
 	Segments []VersionSegment
 	// A field for custom data for the version object.
-	CustomData interface{}
+	CustomData any
 }
 
 // A segment of the version, can either be a number or a text.
@@ -81,7 +81,7 @@ func (v *Version) DefinedSegmentCount() int {
 	return count
 }
 
-// CoreVersion Converts the version to a core SemVer string in the form major.minor.path
+// CoreVersion Converts the version to a core SemVer string in the form major.minor.patch.
 func (v *Version) CoreVersion() string {
 	strs := []string{}
 	for i := 0; i < 3; i++ {
@@ -131,6 +131,95 @@ func (v *Version) Patch() int {
 	return 0
 }
 
+// MatchesConstraints checks if the given version satisfies a version constraint expression.
+// The constraint can contain one or more space-separated constraints, all of which must match (AND logic).
+// For multiple sets, use "||" to separate them (OR logic).
+// Supported operators: <, <=, >, >=, ==, !=, -
+// Examples: "<1.0.0", ">=2.0.0", ">=1.0.0 <2.0.0", "1.0.0 - 2.0.0", "1.0.0 || 2.0.0"
+func (v *Version) MatchesConstraints(constraint string) (bool, error) {
+	if constraint == "" {
+		return true, nil // No constraint means any version is acceptable
+	}
+	// Split by "||" for OR logic
+	constraintSets := strings.Split(constraint, "||")
+	for _, set := range constraintSets {
+		set = strings.TrimSpace(set)
+		if set == "" {
+			continue
+		}
+		if matches, err := v.matchesConstraintSet(set); err != nil {
+			return false, err
+		} else if matches {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (v *Version) matchesConstraintSet(set string) (bool, error) {
+	// Split by space for AND logic
+	constraints := strings.Fields(set)
+	for _, constraint := range constraints {
+		if matches, err := v.matchesSingleConstraint(constraint); err != nil {
+			return false, err
+		} else if !matches {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (v *Version) matchesSingleConstraint(constraint string) (bool, error) {
+	operators := []string{">=", "<=", ">", "<", "==", "!=", "-"}
+	var operator string
+	var versionPart string
+	for _, op := range operators {
+		if strings.HasPrefix(constraint, op) {
+			operator = op
+			versionPart = strings.TrimSpace(constraint[len(op):])
+			break
+		}
+	}
+	if operator == "" {
+		return false, fmt.Errorf("invalid constraint: %s", constraint)
+	}
+	constraintVersion, err := ParseVersionFromRegex(versionPart, RegexpSimple)
+	if err != nil {
+		return false, err
+	}
+	switch operator {
+	case ">":
+		return v.GreaterThan(constraintVersion), nil
+	case ">=":
+		return v.GreaterThanOrEqual(constraintVersion), nil
+	case "<":
+		return v.LessThan(constraintVersion), nil
+	case "<=":
+		return v.LessThanOrEqual(constraintVersion), nil
+	case "==":
+		return v.Equals(constraintVersion), nil
+	case "!=":
+		return !v.Equals(constraintVersion), nil
+	case "-":
+		// Range operator (e.g., "1.0.0 - 2.0.0")
+		rangeParts := strings.Split(versionPart, "-")
+		if len(rangeParts) != 2 {
+			return false, fmt.Errorf("invalid range constraint: %s", constraint)
+		}
+		startVersion, err := ParseVersionFromRegex(strings.TrimSpace(rangeParts[0]), RegexpSimple)
+		if err != nil {
+			return false, err
+		}
+		endVersion, err := ParseVersionFromRegex(strings.TrimSpace(rangeParts[1]), RegexpSimple)
+		if err != nil {
+			return false, err
+		}
+		return v.GreaterThanOrEqual(startVersion) && v.LessThanOrEqual(endVersion), nil
+	}
+
+	return false, nil
+}
+
 func Compare(a *Version, b *Version) int {
 	return a.CompareTo(b)
 }
@@ -159,8 +248,16 @@ func (a *Version) GreaterThan(b *Version) bool {
 	return a.CompareTo(b) == 1
 }
 
+func (a *Version) GreaterThanOrEqual(b *Version) bool {
+	return a.CompareTo(b) >= 0
+}
+
 func (a *Version) LessThan(b *Version) bool {
 	return a.CompareTo(b) == -1
+}
+
+func (a *Version) LessThanOrEqual(b *Version) bool {
+	return a.CompareTo(b) <= 0
 }
 
 func (a *Version) Equals(b *Version) bool {
@@ -243,7 +340,7 @@ func ParseSimple(parts ...interface{}) *Version {
 				segmentsToAdd = append(segmentsToAdd, buildSegmentFromString(x))
 			}
 		default:
-			// Conver the value to string
+			// Convert the value to string
 			str := fmt.Sprintf("%v", v)
 			segmentsToAdd = append(segmentsToAdd, buildSegmentFromString(str))
 		}
