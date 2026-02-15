@@ -132,10 +132,29 @@ func (v *Version) Patch() int {
 }
 
 // MatchesConstraints checks if the given version satisfies a version constraint expression.
-// The constraint can contain one or more space-separated constraints, all of which must match (AND logic).
-// For multiple sets, use "||" to separate them (OR logic).
-// Supported operators: <, <=, >, >=, ==, !=, -
-// Examples: "<1.0.0", ">=2.0.0", ">=1.0.0 <2.0.0", "1.0.0 - 2.0.0", "1.0.0 || 2.0.0"
+// Constraints can be combined using logical operators:
+// - Space-separated constraints are combined with AND logic (all must match).
+// - Use "||" to separate constraint sets with OR logic (at least one set must match).
+// - Use "&&" as an alternative to space for AND logic.
+//
+// Supported operators:
+// - Comparison: <, <=, >, >=, ==, !=, = (alias for ==)
+// - Range: "start - end" (equivalent to ">=start <=end")
+// - Caret (^): Compatible versions, e.g., ^1.2.3 allows 1.x.x but not 2.x.x
+// - Tilde (~): Patch-level changes, e.g., ~1.2.3 allows 1.2.x
+// - Wildcard (*): Partial matching, e.g., "1.*" matches 1.x.x, "1.2.*" matches 1.2.x
+// - Regex: =~ (matches), !~ (does not match) against the version string
+//
+// Examples:
+// - "<1.0.0": version < 1.0.0
+// - ">=2.0.0": version >= 2.0.0
+// - ">=1.0.0 <2.0.0": version in [1.0.0, 2.0.0)
+// - "1.0.0 - 2.0.0": same as above
+// - "^1.2.3": compatible with 1.x.x
+// - "~1.2.3": patch-level changes within 1.2.x
+// - "1.*": any 1.x.x version
+// - "=~^1\\..*": regex match for versions starting with 1.
+// - "==1.0.0 || ==2.0.0": exactly 1.0.0 or 2.0.0
 func (v *Version) MatchesConstraints(constraint string) (bool, error) {
 	if constraint == "" {
 		return true, nil // No constraint means any version is acceptable
@@ -157,6 +176,14 @@ func (v *Version) MatchesConstraints(constraint string) (bool, error) {
 }
 
 func (v *Version) matchesConstraintSet(set string) (bool, error) {
+	// Handle range with hypen
+	if strings.Contains(set, " - ") && !strings.ContainsAny(set, "<>=") {
+		parts := strings.SplitN(set, " - ", 2)
+		set = fmt.Sprintf(">=%s <=%s", strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
+	}
+
+	// Replace explicit && with space for AND logic
+	set = strings.ReplaceAll(set, "&&", " ")
 	// Split by space for AND logic
 	constraints := strings.Fields(set)
 	for _, constraint := range constraints {
@@ -170,54 +197,117 @@ func (v *Version) matchesConstraintSet(set string) (bool, error) {
 }
 
 func (v *Version) matchesSingleConstraint(constraint string) (bool, error) {
-	operators := []string{">=", "<=", ">", "<", "==", "!=", "-"}
-	var operator string
-	var versionPart string
-	for _, op := range operators {
-		if strings.HasPrefix(constraint, op) {
-			operator = op
-			versionPart = strings.TrimSpace(constraint[len(op):])
-			break
-		}
-	}
-	if operator == "" {
-		return false, fmt.Errorf("invalid constraint: %s", constraint)
-	}
-	constraintVersion, err := ParseVersionFromRegex(versionPart, RegexpSimple)
-	if err != nil {
-		return false, err
-	}
-	switch operator {
-	case ">":
-		return v.GreaterThan(constraintVersion), nil
-	case ">=":
-		return v.GreaterThanOrEqual(constraintVersion), nil
-	case "<":
-		return v.LessThan(constraintVersion), nil
-	case "<=":
-		return v.LessThanOrEqual(constraintVersion), nil
-	case "==":
-		return v.Equals(constraintVersion), nil
-	case "!=":
-		return !v.Equals(constraintVersion), nil
-	case "-":
-		// Range operator (e.g., "1.0.0 - 2.0.0")
-		rangeParts := strings.Split(versionPart, "-")
-		if len(rangeParts) != 2 {
-			return false, fmt.Errorf("invalid range constraint: %s", constraint)
-		}
-		startVersion, err := ParseVersionFromRegex(strings.TrimSpace(rangeParts[0]), RegexpSimple)
+	// Handle Regex
+	if strings.HasPrefix(constraint, "=~") || strings.HasPrefix(constraint, "!~") {
+		operator := constraint[:2]
+		constraintVersionString := strings.TrimSpace(constraint[2:])
+		re, err := regexp.Compile(constraintVersionString)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("invalid regex in constraint: %s", err)
 		}
-		endVersion, err := ParseVersionFromRegex(strings.TrimSpace(rangeParts[1]), RegexpSimple)
-		if err != nil {
-			return false, err
+		raw := v.Raw
+		if raw == "" {
+			raw = v.CoreVersion()
 		}
-		return v.GreaterThanOrEqual(startVersion) && v.LessThanOrEqual(endVersion), nil
+		matched := re.MatchString(raw)
+		if operator == "!~" {
+			return !matched, nil
+		}
+		return matched, nil
 	}
 
-	return false, nil
+	// Caret
+	if strings.HasPrefix(constraint, "^") {
+		constraintVersionString := strings.TrimSpace(constraint[1:])
+		constraintVersion, err := ParseVersionFromRegex(constraintVersionString, RegexpSimple)
+		if err != nil {
+			return false, err
+		}
+		if constraintVersion.Major() > 0 {
+			// For major version > 0, only the major version is significant
+			return v.GreaterThanOrEqual(constraintVersion) && v.LessThan(ParseSimple(constraintVersion.Major()+1, 0, 0)), nil
+		}
+		if constraintVersion.Minor() > 0 {
+			// For major version 0 and minor version > 0, only the major and minor versions are significant
+			return v.GreaterThanOrEqual(constraintVersion) && v.LessThan(ParseSimple(0, constraintVersion.Minor()+1, 0)), nil
+		} else {
+			// For major version 0 and minor version 0, only the patch version is significant
+			return v.GreaterThanOrEqual(constraintVersion) && v.LessThan(ParseSimple(0, 0, constraintVersion.Patch()+1)), nil
+		}
+	}
+
+	// Tilde
+	if strings.HasPrefix(constraint, "~") {
+		constraintVersionString := strings.TrimSpace(constraint[1:])
+		constraintVersion, err := ParseVersionFromRegex(constraintVersionString, RegexpSimple)
+		if err != nil {
+			return false, err
+		}
+		// The patch version is not significant, but the major and minor versions are
+		return v.GreaterThanOrEqual(constraintVersion) && v.LessThan(ParseSimple(constraintVersion.Major(), constraintVersion.Minor()+1, 0)), nil
+	}
+
+	// Wildcard
+	if strings.Contains(constraint, "*") {
+		if constraint == "*" {
+			// Any version matches
+			return true, nil
+		}
+		parts := strings.Split(constraint, ".")
+		if len(parts) == 2 && parts[1] == "*" {
+			maj, err := strconv.Atoi(parts[0])
+			if err != nil {
+				return false, err
+			}
+			return v.GreaterThanOrEqual(ParseSimple(maj, 0, 0)) && v.LessThan(ParseSimple(maj+1, 0, 0)), nil
+		}
+
+		if len(parts) == 3 && parts[2] == "*" {
+			maj, err := strconv.Atoi(parts[0])
+			if err != nil {
+				return false, err
+			}
+			min, err := strconv.Atoi(parts[1])
+			if err != nil {
+				return false, err
+			}
+			return v.GreaterThanOrEqual(ParseSimple(maj, min, 0)) && v.LessThan(ParseSimple(maj, min+1, 0)), nil
+		}
+	}
+
+	// Handle others
+	operators := []string{">=", "<=", ">", "<", "==", "!=", "="}
+	for _, operator := range operators {
+		if strings.HasPrefix(constraint, operator) {
+			constraintVersionString := strings.TrimSpace(constraint[len(operator):])
+			constraintVersion, err := ParseVersionFromRegex(constraintVersionString, RegexpSimple)
+			if err != nil {
+				return false, err
+			}
+			switch operator {
+			case ">=":
+				return v.GreaterThanOrEqual(constraintVersion), nil
+			case ">":
+				return v.GreaterThan(constraintVersion), nil
+			case "<=":
+				return v.LessThanOrEqual(constraintVersion), nil
+			case "<":
+				return v.LessThan(constraintVersion), nil
+			case "==", "=":
+				return v.Equals(constraintVersion), nil
+			case "!=":
+				return !v.Equals(constraintVersion), nil
+			}
+		}
+	}
+
+	// Exact version
+	constraintVersion, err := ParseVersionFromRegex(constraint, RegexpSimple)
+	if err == nil {
+		return v.Equals(constraintVersion), nil
+	}
+
+	return false, fmt.Errorf("invalid constraint: %s", constraint)
 }
 
 func Compare(a *Version, b *Version) int {
@@ -318,7 +408,7 @@ func FindMax(versions []*Version, referenceVersion *Version, onlyWithoutStringVa
 //////////
 
 // Parses the given parts into a version.
-func ParseSimple(parts ...interface{}) *Version {
+func ParseSimple(parts ...any) *Version {
 	version := &Version{}
 	for _, part := range parts {
 		segmentsToAdd := []VersionSegment{}
