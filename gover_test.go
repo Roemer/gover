@@ -340,3 +340,251 @@ func TestRaw(t *testing.T) {
 		assert.True(version.Equals(ParseSimple(4, 5, 6)))
 	}
 }
+
+func TestGreaterOrLess(t *testing.T) {
+	assert := assert.New(t)
+
+	versionPairs := []struct {
+		v1 string
+		v2 string
+	}{
+		{"1.2.3", "1.2.4"},
+		{"1.2.3", "1.3.0"},
+		{"2.4.0", "3.1.2"},
+	}
+
+	for _, pair := range versionPairs {
+		v1 := MustParseVersionFromRegex(pair.v1, RegexpSimple)
+		v2 := MustParseVersionFromRegex(pair.v2, RegexpSimple)
+		assert.True(v1.LessThan(v2))
+		assert.False(v1.GreaterThan(v2))
+
+		assert.True(v1.GreaterThanOrEqual(v1))
+		assert.True(v1.LessThanOrEqual(v1))
+	}
+}
+
+func TestMatchConstraints(t *testing.T) {
+	assert := assert.New(t)
+
+	type testCase struct {
+		version     *Version
+		constraints string
+		shouldMatch bool
+	}
+	testCases := []testCase{
+		// -------------------------
+		// BASIC COMPARISONS
+		// -------------------------
+		{ParseSimple(1, 2, 3), ">1.2.0", true},
+		{ParseSimple(1, 2, 3), ">1.2.3", false},
+		{ParseSimple(1, 2, 3), ">=1.2.3", true},
+		{ParseSimple(1, 2, 3), ">=1.2.4", false},
+
+		{ParseSimple(1, 2, 3), "<1.3.0", true},
+		{ParseSimple(1, 2, 3), "<1.2.3", false},
+		{ParseSimple(1, 2, 3), "<=1.2.3", true},
+		{ParseSimple(1, 2, 3), "<=1.2.2", false},
+
+		// equality
+		{ParseSimple(1, 2, 3), "1.2.3", true},
+		{ParseSimple(1, 2, 3), "=1.2.3", true},
+		{ParseSimple(1, 2, 3), "==1.2.3", true},
+		{ParseSimple(1, 2, 3), "==1.2.4", false},
+
+		// not equal
+		{ParseSimple(1, 2, 3), "!=1.2.4", true},
+		{ParseSimple(1, 2, 3), "!=1.2.3", false},
+
+		// -------------------------
+		// AND (space)
+		// -------------------------
+		{ParseSimple(1, 2, 3), ">1.0.0 <2.0.0", true},
+		{ParseSimple(1, 2, 3), ">1.0.0 <1.2.0", false},
+		{ParseSimple(1, 2, 3), ">=1.2.3 <2.0.0", true},
+		{ParseSimple(1, 2, 3), ">=1.2.4 <2.0.0", false},
+
+		// explicit &&
+		{ParseSimple(1, 2, 3), ">1.0.0 && <2.0.0", true},
+		{ParseSimple(1, 2, 3), ">1.0.0 && <1.2.0", false},
+
+		// -------------------------
+		// OR
+		// -------------------------
+		{ParseSimple(1, 2, 3), "<1.0.0 || >=1.2.3", true},
+		{ParseSimple(1, 2, 3), "<1.0.0 || >1.2.3", false},
+		{ParseSimple(1, 2, 3), "<1.0.0 || >2.0.0", false},
+		{ParseSimple(1, 2, 3), "<1.0.0 || <2.0.0", true},
+
+		// multiple OR
+		{ParseSimple(1, 2, 3), "<1.0.0 || >2.0.0 || =1.2.3", true},
+		{ParseSimple(1, 2, 3), "<1.0.0 || >2.0.0 || =1.2.4", false},
+
+		// -------------------------
+		// CARET ^
+		// -------------------------
+		{ParseSimple(1, 2, 3), "^1.2.0", true},
+		{ParseSimple(1, 2, 3), "^1.3.0", false},
+		{ParseSimple(1, 2, 3), "^1.2.3", true},
+		{ParseSimple(1, 2, 3), "^2.0.0", false},
+
+		// caret zero-major rules
+		{ParseSimple(0, 2, 3), "^0.2.0", true},
+		{ParseSimple(0, 2, 3), "^0.3.0", false},
+		{ParseSimple(0, 0, 3), "^0.0.3", true},
+		{ParseSimple(0, 0, 3), "^0.0.4", false},
+
+		// -------------------------
+		// TILDE ~
+		// -------------------------
+		{ParseSimple(1, 2, 3), "~1.2.0", true},
+		{ParseSimple(1, 2, 3), "~1.3.0", false},
+		{ParseSimple(1, 2, 3), "~1.2", true},
+		{ParseSimple(1, 2, 3), "~1.1", false},
+
+		// -------------------------
+		// WILDCARDS
+		// -------------------------
+		{ParseSimple(1, 2, 3), "*", true},
+		{ParseSimple(1, 2, 3), "1.*", true},
+		{ParseSimple(1, 2, 3), "2.*", false},
+		{ParseSimple(1, 2, 3), "1.2.*", true},
+		{ParseSimple(1, 2, 3), "1.3.*", false},
+
+		// -------------------------
+		// HYPHEN RANGES
+		// -------------------------
+		{ParseSimple(1, 2, 3), "1.0.0 - 2.0.0", true},
+		{ParseSimple(1, 2, 3), "1.2.3 - 2.0.0", true},
+		{ParseSimple(1, 2, 3), "1.2.4 - 2.0.0", false},
+		{ParseSimple(1, 2, 3), "0.5.0 - 1.2.2", false},
+
+		// -------------------------
+		// MIXED EXPRESSIONS
+		// -------------------------
+		{ParseSimple(1, 2, 3), "^1.0.0 || ^2.0.0", true},
+		{ParseSimple(2, 1, 0), "^1.0.0 || ^2.0.0", true},
+		{ParseSimple(3, 0, 0), "^1.0.0 || ^2.0.0", false},
+
+		{ParseSimple(1, 2, 3), ">=1.0.0 <2.0.0 || >=3.0.0", true},
+		{ParseSimple(3, 1, 0), ">=1.0.0 <2.0.0 || >=3.0.0", true},
+		{ParseSimple(2, 5, 0), ">=1.0.0 <2.0.0 || >=3.0.0", false},
+
+		// AND + OR combo
+		{ParseSimple(1, 2, 3), ">1.0.0 <2.0.0 || >5.0.0", true},
+		{ParseSimple(5, 1, 0), ">1.0.0 <2.0.0 || >5.0.0", true},
+		{ParseSimple(2, 1, 0), ">1.0.0 <2.0.0 || >5.0.0", false},
+
+		// =====================================================
+		// REGEX MATCH =~
+		// =====================================================
+
+		// exact match
+		{ParseSimple(1, 2, 3), "=~^1\\.2\\.3$", true},
+		{ParseSimple(1, 2, 3), "=~^1\\.2\\.4$", false},
+
+		// major match
+		{ParseSimple(1, 2, 3), "=~^1\\.", true},
+		{ParseSimple(2, 2, 3), "=~^1\\.", false},
+
+		// minor match
+		{ParseSimple(1, 2, 3), "=~^1\\.2\\.", true},
+		{ParseSimple(1, 3, 0), "=~^1\\.2\\.", false},
+
+		// patch match
+		{ParseSimple(1, 2, 3), "=~3$", true},
+		{ParseSimple(1, 2, 4), "=~3$", false},
+
+		// wildcard-like regex
+		{ParseSimple(1, 2, 3), "=~^1\\..*", true},
+		{ParseSimple(2, 0, 0), "=~^1\\..*", false},
+
+		// any version
+		{ParseSimple(1, 2, 3), "=~.*", true},
+
+		// =====================================================
+		// REGEX NEGATION !~
+		// =====================================================
+
+		{ParseSimple(1, 2, 3), "!~^1\\.2\\.3$", false},
+		{ParseSimple(1, 2, 3), "!~^2\\.", true},
+		{ParseSimple(2, 0, 0), "!~^1\\.", true},
+		{ParseSimple(2, 0, 0), "!~^2\\.", false},
+
+		// patch exclusion
+		{ParseSimple(1, 2, 3), "!~3$", false},
+		{ParseSimple(1, 2, 4), "!~3$", true},
+
+		// =====================================================
+		// REGEX WITH AND
+		// =====================================================
+
+		{ParseSimple(1, 2, 3), ">=1.0.0 =~^1\\.", true},
+		{ParseSimple(2, 0, 0), ">=1.0.0 =~^1\\.", false},
+
+		{ParseSimple(1, 2, 3), "<2.0.0 =~^1\\.2\\.", true},
+		{ParseSimple(1, 3, 0), "<2.0.0 =~^1\\.2\\.", false},
+
+		// =====================================================
+		// REGEX WITH OR
+		// =====================================================
+
+		{ParseSimple(1, 2, 3), "=~^2\\. || =~^1\\.", true},
+		{ParseSimple(2, 0, 0), "=~^2\\. || =~^1\\.", true},
+		{ParseSimple(3, 0, 0), "=~^2\\. || =~^1\\.", false},
+
+		// negated branch
+		{ParseSimple(1, 2, 3), "!~^2\\. || >5.0.0", true},
+		{ParseSimple(2, 0, 0), "!~^2\\. || >5.0.0", false},
+
+		// =====================================================
+		// MIXED REGEX + SEMVER
+		// =====================================================
+
+		{ParseSimple(1, 2, 3), "^1.0.0 =~^1\\.", true},
+		{ParseSimple(2, 0, 0), "^1.0.0 =~^1\\.", false},
+
+		{ParseSimple(1, 2, 3), "^1.0.0 !~beta", true},
+
+		// OR combination
+		{ParseSimple(3, 0, 0), "=~^1\\. || >=3.0.0", true},
+		{ParseSimple(2, 0, 0), "=~^1\\. || >=3.0.0", false},
+
+		// =====================================================
+		// EDGE CASES
+		// =====================================================
+
+		// match full numeric pattern
+		{ParseSimple(10, 20, 30), "=~^10\\.20\\.30$", true},
+		{ParseSimple(10, 20, 31), "=~^10\\.20\\.30$", false},
+
+		// multi-digit
+		{ParseSimple(12, 3, 4), "=~^12\\.", true},
+		{ParseSimple(2, 3, 4), "=~^12\\.", false},
+
+		// ensure regex doesn't bypass AND
+		{ParseSimple(1, 2, 3), ">2.0.0 =~^1\\.", false},
+
+		// ensure negation with AND
+		{ParseSimple(1, 2, 3), ">=1.0.0 !~^2\\.", true},
+		{ParseSimple(2, 0, 0), ">=1.0.0 !~^2\\.", false},
+	}
+	for _, tc := range testCases {
+		version := tc.version
+		constraints := tc.constraints
+		match, err := version.MatchesConstraints(constraints)
+		assert.NoError(err)
+		assert.Equalf(tc.shouldMatch, match, "Version %s should match constraint %s: expected %v", version, constraints, tc.shouldMatch)
+	}
+}
+
+func TestMatchConstraints_InvalidConstraints(t *testing.T) {
+	assert := assert.New(t)
+	version := ParseSimple(1, 2, 3)
+	// invalid regex after =~ should produce an error
+	_, err := version.MatchesConstraints("=~[")
+	assert.Error(err)
+	// completely invalid constraint string should also produce an error
+	_, err = version.MatchesConstraints(">>>invalid<<<")
+	assert.Error(err)
+}

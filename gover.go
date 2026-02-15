@@ -32,7 +32,7 @@ type Version struct {
 	// The different segements of the version.
 	Segments []VersionSegment
 	// A field for custom data for the version object.
-	CustomData interface{}
+	CustomData any
 }
 
 // A segment of the version, can either be a number or a text.
@@ -81,7 +81,7 @@ func (v *Version) DefinedSegmentCount() int {
 	return count
 }
 
-// CoreVersion Converts the version to a core SemVer string in the form major.minor.path
+// CoreVersion Converts the version to a core SemVer string in the form major.minor.patch.
 func (v *Version) CoreVersion() string {
 	strs := []string{}
 	for i := 0; i < 3; i++ {
@@ -131,6 +131,186 @@ func (v *Version) Patch() int {
 	return 0
 }
 
+// MatchesConstraints checks if the given version satisfies a version constraint expression.
+// Constraints can be combined using logical operators:
+// - Space-separated constraints are combined with AND logic (all must match).
+// - Use "||" to separate constraint sets with OR logic (at least one set must match).
+// - Use "&&" as an alternative to space for AND logic.
+//
+// Supported operators:
+// - Comparison: <, <=, >, >=, ==, !=, = (alias for ==)
+// - Range: "start - end" (equivalent to ">=start <=end")
+// - Caret (^): Compatible versions, e.g., ^1.2.3 allows 1.x.x but not 2.x.x
+// - Tilde (~): Patch-level changes, e.g., ~1.2.3 allows 1.2.x
+// - Wildcard (*): Partial matching, e.g., "1.*" matches 1.x.x, "1.2.*" matches 1.2.x
+// - Regex: =~ (matches), !~ (does not match) against the version string
+//
+// Examples:
+// - "<1.0.0": version < 1.0.0
+// - ">=2.0.0": version >= 2.0.0
+// - ">=1.0.0 <2.0.0": version in [1.0.0, 2.0.0)
+// - "1.0.0 - 2.0.0": same as above
+// - "^1.2.3": compatible with 1.x.x
+// - "~1.2.3": patch-level changes within 1.2.x
+// - "1.*": any 1.x.x version
+// - "=~^1\\..*": regex match for versions starting with 1.
+// - "==1.0.0 || ==2.0.0": exactly 1.0.0 or 2.0.0
+func (v *Version) MatchesConstraints(constraint string) (bool, error) {
+	constraint = strings.TrimSpace(constraint)
+	if constraint == "" {
+		return true, nil // No constraint means any version is acceptable
+	}
+	// Split by "||" for OR logic
+	constraintSets := strings.Split(constraint, "||")
+	for _, set := range constraintSets {
+		set = strings.TrimSpace(set)
+		if set == "" {
+			continue
+		}
+		if matches, err := v.matchesConstraintSet(set); err != nil {
+			return false, err
+		} else if matches {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (v *Version) matchesConstraintSet(set string) (bool, error) {
+	// Handle range with hyphen
+	if strings.Contains(set, " - ") && !strings.ContainsAny(set, "<>=") {
+		parts := strings.SplitN(set, " - ", 2)
+		set = fmt.Sprintf(">=%s <=%s", strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
+	}
+
+	// Replace explicit && with space for AND logic
+	set = strings.ReplaceAll(set, "&&", " ")
+	// Split by space for AND logic
+	constraints := strings.Fields(set)
+	for _, constraint := range constraints {
+		if matches, err := v.matchesSingleConstraint(constraint); err != nil {
+			return false, err
+		} else if !matches {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (v *Version) matchesSingleConstraint(constraint string) (bool, error) {
+	// Handle Regex
+	if strings.HasPrefix(constraint, "=~") || strings.HasPrefix(constraint, "!~") {
+		operator := constraint[:2]
+		constraintVersionString := strings.TrimSpace(constraint[2:])
+		re, err := regexp.Compile(constraintVersionString)
+		if err != nil {
+			return false, fmt.Errorf("invalid regex in constraint: %w", err)
+		}
+		raw := v.Raw
+		if raw == "" {
+			raw = v.CoreVersion()
+		}
+		matched := re.MatchString(raw)
+		if operator == "!~" {
+			return !matched, nil
+		}
+		return matched, nil
+	}
+
+	// Caret
+	if strings.HasPrefix(constraint, "^") {
+		constraintVersionString := strings.TrimSpace(constraint[1:])
+		constraintVersion, err := ParseVersionFromRegex(constraintVersionString, RegexpSimple)
+		if err != nil {
+			return false, err
+		}
+		if constraintVersion.Major() > 0 {
+			// For major version > 0, only the major version is significant
+			return v.GreaterThanOrEqual(constraintVersion) && v.LessThan(ParseSimple(constraintVersion.Major()+1, 0, 0)), nil
+		}
+		if constraintVersion.Minor() > 0 {
+			// For major version 0 and minor version > 0, only the major and minor versions are significant
+			return v.GreaterThanOrEqual(constraintVersion) && v.LessThan(ParseSimple(0, constraintVersion.Minor()+1, 0)), nil
+		} else {
+			// For major version 0 and minor version 0, only the patch version is significant
+			return v.GreaterThanOrEqual(constraintVersion) && v.LessThan(ParseSimple(0, 0, constraintVersion.Patch()+1)), nil
+		}
+	}
+
+	// Tilde
+	if strings.HasPrefix(constraint, "~") {
+		constraintVersionString := strings.TrimSpace(constraint[1:])
+		constraintVersion, err := ParseVersionFromRegex(constraintVersionString, RegexpSimple)
+		if err != nil {
+			return false, err
+		}
+		// The patch version is not significant, but the major and minor versions are
+		return v.GreaterThanOrEqual(constraintVersion) && v.LessThan(ParseSimple(constraintVersion.Major(), constraintVersion.Minor()+1, 0)), nil
+	}
+
+	// Wildcard
+	if strings.Contains(constraint, "*") {
+		if constraint == "*" {
+			// Any version matches
+			return true, nil
+		}
+		parts := strings.Split(constraint, ".")
+		if len(parts) == 2 && parts[1] == "*" {
+			maj, err := strconv.Atoi(parts[0])
+			if err != nil {
+				return false, err
+			}
+			return v.GreaterThanOrEqual(ParseSimple(maj, 0, 0)) && v.LessThan(ParseSimple(maj+1, 0, 0)), nil
+		}
+
+		if len(parts) == 3 && parts[2] == "*" {
+			maj, err := strconv.Atoi(parts[0])
+			if err != nil {
+				return false, err
+			}
+			min, err := strconv.Atoi(parts[1])
+			if err != nil {
+				return false, err
+			}
+			return v.GreaterThanOrEqual(ParseSimple(maj, min, 0)) && v.LessThan(ParseSimple(maj, min+1, 0)), nil
+		}
+	}
+
+	// Handle others
+	operators := []string{">=", "<=", ">", "<", "==", "!=", "="}
+	for _, operator := range operators {
+		if strings.HasPrefix(constraint, operator) {
+			constraintVersionString := strings.TrimSpace(constraint[len(operator):])
+			constraintVersion, err := ParseVersionFromRegex(constraintVersionString, RegexpSimple)
+			if err != nil {
+				return false, err
+			}
+			switch operator {
+			case ">=":
+				return v.GreaterThanOrEqual(constraintVersion), nil
+			case ">":
+				return v.GreaterThan(constraintVersion), nil
+			case "<=":
+				return v.LessThanOrEqual(constraintVersion), nil
+			case "<":
+				return v.LessThan(constraintVersion), nil
+			case "==", "=":
+				return v.Equals(constraintVersion), nil
+			case "!=":
+				return !v.Equals(constraintVersion), nil
+			}
+		}
+	}
+
+	// Exact version
+	constraintVersion, err := ParseVersionFromRegex(constraint, RegexpSimple)
+	if err == nil {
+		return v.Equals(constraintVersion), nil
+	}
+
+	return false, fmt.Errorf("invalid constraint: %s", constraint)
+}
+
 func Compare(a *Version, b *Version) int {
 	return a.CompareTo(b)
 }
@@ -159,8 +339,16 @@ func (a *Version) GreaterThan(b *Version) bool {
 	return a.CompareTo(b) == 1
 }
 
+func (a *Version) GreaterThanOrEqual(b *Version) bool {
+	return a.CompareTo(b) >= 0
+}
+
 func (a *Version) LessThan(b *Version) bool {
 	return a.CompareTo(b) == -1
+}
+
+func (a *Version) LessThanOrEqual(b *Version) bool {
+	return a.CompareTo(b) <= 0
 }
 
 func (a *Version) Equals(b *Version) bool {
@@ -221,7 +409,7 @@ func FindMax(versions []*Version, referenceVersion *Version, onlyWithoutStringVa
 //////////
 
 // Parses the given parts into a version.
-func ParseSimple(parts ...interface{}) *Version {
+func ParseSimple(parts ...any) *Version {
 	version := &Version{}
 	for _, part := range parts {
 		segmentsToAdd := []VersionSegment{}
@@ -243,7 +431,7 @@ func ParseSimple(parts ...interface{}) *Version {
 				segmentsToAdd = append(segmentsToAdd, buildSegmentFromString(x))
 			}
 		default:
-			// Conver the value to string
+			// Convert the value to string
 			str := fmt.Sprintf("%v", v)
 			segmentsToAdd = append(segmentsToAdd, buildSegmentFromString(str))
 		}
