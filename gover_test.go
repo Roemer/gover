@@ -577,3 +577,14 @@ func TestMatchConstraints(t *testing.T) {
 		assert.Equalf(tc.shouldMatch, match, "Version %s should match constraint %s: expected %v", version, constraints, tc.shouldMatch)
 	}
 }
+
+func TestMatchConstraints_InvalidConstraints(t *testing.T) {
+	assert := assert.New(t)
+	version := ParseSimple(1, 2, 3)
+	// invalid regex after =~ should produce an error
+	_, err := version.MatchesConstraints("=~[")
+	assert.Error(err)
+	// completely invalid constraint string should also produce an error
+	_, err = version.MatchesConstraints(">>>invalid<<<")
+	assert.Error(err)
+}
