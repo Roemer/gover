@@ -156,6 +156,7 @@ func (v *Version) Patch() int {
 // - "=~^1\\..*": regex match for versions starting with 1.
 // - "==1.0.0 || ==2.0.0": exactly 1.0.0 or 2.0.0
 func (v *Version) MatchesConstraints(constraint string) (bool, error) {
+	constraint = strings.TrimSpace(constraint)
 	if constraint == "" {
 		return true, nil // No constraint means any version is acceptable
 	}
@@ -176,7 +177,7 @@ func (v *Version) MatchesConstraints(constraint string) (bool, error) {
 }
 
 func (v *Version) matchesConstraintSet(set string) (bool, error) {
-	// Handle range with hypen
+	// Handle range with hyphen
 	if strings.Contains(set, " - ") && !strings.ContainsAny(set, "<>=") {
 		parts := strings.SplitN(set, " - ", 2)
 		set = fmt.Sprintf(">=%s <=%s", strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
@@ -203,7 +204,7 @@ func (v *Version) matchesSingleConstraint(constraint string) (bool, error) {
 		constraintVersionString := strings.TrimSpace(constraint[2:])
 		re, err := regexp.Compile(constraintVersionString)
 		if err != nil {
-			return false, fmt.Errorf("invalid regex in constraint: %s", err)
+			return false, fmt.Errorf("invalid regex in constraint: %w", err)
 		}
 		raw := v.Raw
 		if raw == "" {

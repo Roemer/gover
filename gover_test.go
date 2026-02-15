@@ -354,8 +354,8 @@ func TestGreaterOrLess(t *testing.T) {
 	}
 
 	for _, pair := range versionPairs {
-		v1 := ParseSimple(pair.v1)
-		v2 := ParseSimple(pair.v2)
+		v1 := MustParseVersionFromRegex(pair.v1, RegexpSimple)
+		v2 := MustParseVersionFromRegex(pair.v2, RegexpSimple)
 		assert.True(v1.LessThan(v2))
 		assert.False(v1.GreaterThan(v2))
 
