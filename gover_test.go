@@ -340,3 +340,26 @@ func TestRaw(t *testing.T) {
 		assert.True(version.Equals(ParseSimple(4, 5, 6)))
 	}
 }
+
+func TestGreaterOrLess(t *testing.T) {
+	assert := assert.New(t)
+
+	versionPairs := []struct {
+		v1 string
+		v2 string
+	}{
+		{"1.2.3", "1.2.4"},
+		{"1.2.3", "1.3.0"},
+		{"2.4.0", "3.1.2"},
+	}
+
+	for _, pair := range versionPairs {
+		v1 := MustParseVersionFromRegex(pair.v1, RegexpSimple)
+		v2 := MustParseVersionFromRegex(pair.v2, RegexpSimple)
+		assert.True(v1.LessThan(v2))
+		assert.False(v1.GreaterThan(v2))
+
+		assert.True(v1.GreaterThanOrEqual(v1))
+		assert.True(v1.LessThanOrEqual(v1))
+	}
+}

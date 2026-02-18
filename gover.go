@@ -32,7 +32,7 @@ type Version struct {
 	// The different segements of the version.
 	Segments []VersionSegment
 	// A field for custom data for the version object.
-	CustomData interface{}
+	CustomData any
 }
 
 // A segment of the version, can either be a number or a text.
@@ -81,7 +81,7 @@ func (v *Version) DefinedSegmentCount() int {
 	return count
 }
 
-// CoreVersion Converts the version to a core SemVer string in the form major.minor.path
+// CoreVersion Converts the version to a core SemVer string in the form major.minor.patch
 func (v *Version) CoreVersion() string {
 	strs := []string{}
 	for i := 0; i < 3; i++ {
@@ -159,8 +159,16 @@ func (a *Version) GreaterThan(b *Version) bool {
 	return a.CompareTo(b) == 1
 }
 
+func (a *Version) GreaterThanOrEqual(b *Version) bool {
+	return a.CompareTo(b) >= 0
+}
+
 func (a *Version) LessThan(b *Version) bool {
 	return a.CompareTo(b) == -1
+}
+
+func (a *Version) LessThanOrEqual(b *Version) bool {
+	return a.CompareTo(b) <= 0
 }
 
 func (a *Version) Equals(b *Version) bool {
@@ -221,7 +229,7 @@ func FindMax(versions []*Version, referenceVersion *Version, onlyWithoutStringVa
 //////////
 
 // Parses the given parts into a version.
-func ParseSimple(parts ...interface{}) *Version {
+func ParseSimple(parts ...any) *Version {
 	version := &Version{}
 	for _, part := range parts {
 		segmentsToAdd := []VersionSegment{}
@@ -243,7 +251,7 @@ func ParseSimple(parts ...interface{}) *Version {
 				segmentsToAdd = append(segmentsToAdd, buildSegmentFromString(x))
 			}
 		default:
-			// Conver the value to string
+			// Convert the value to string
 			str := fmt.Sprintf("%v", v)
 			segmentsToAdd = append(segmentsToAdd, buildSegmentFromString(str))
 		}
